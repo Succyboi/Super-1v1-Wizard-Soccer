@@ -1,0 +1,661 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/phaser@3.15.1/dist/phaser-arcade-physics.js"></script>
+</head>
+<body style="margin: 0;">
+    
+    <!--Usually I would hate myself for not making a seperate file for a script,
+    but since we're making a minigame in an engine I couldn't care less about fuck it.-->
+    <script>
+
+    //define these for convenience
+    var screenWidth = window.innerWidth;
+    var screenHeight = window.innerHeight;
+
+    var spriteSizeMultiplier = 3 + 3 * 0.5 * ((screenWidth / 1000) * (screenHeight / 500));
+
+    var worldWidth = Math.round(screenWidth / spriteSizeMultiplier);
+    var worldHeight = Math.round(screenHeight / spriteSizeMultiplier);
+
+    var config = {
+        type: Phaser.AUTO,
+        width: screenWidth,
+        height: screenHeight,
+        roundPixels: true,
+        backgroundColor: '#262322',
+        pixelArt: true,
+        physics: {
+            default: 'arcade',
+            arcade: {
+                gravity: { y: 0 }
+            }
+        },
+        scene: {
+            preload: preload,
+            create: create,
+            update: update
+        }
+    };
+
+    //#region variables
+
+    //general variables
+    var game = new Phaser.Game(config);
+    var gameIsOver = false;
+    var gameHasStarted = false;
+
+    //controls
+    var left_0;
+    var up_0;
+    var right_0;
+    var down_0;
+
+    var left_1;
+    var up_1;
+    var right_1;
+    var down_1;
+
+    var restart;
+
+    //groups
+    var allPlayersGroup;
+    var genericPropsGroup;
+    var staticObjectsGroup;
+    var backgroundObjectsGroup;
+    var goalsGroup;
+    var scoresGroup;
+
+    //player variables (no we're not doing this in config I don't really care)
+    var playerSpeed = 75;
+    var player_0;
+    var player_1;
+
+    var player_0_score = 0;
+    var player_1_score = 0;
+
+    //misc variables
+    var dog;
+
+    var ball;
+    var maxVelocity = 250;
+
+    var goal_0;
+    var goal_1;
+
+    var number_0;
+    var number_1;
+
+    var logo;
+    var site;
+    var controls0;
+    var controls1;
+
+    //sound and stuff
+    var bump;
+    var hurt;
+    var start;
+    var bark;
+
+    var musicIsPlaying = false;
+
+    var mute;
+
+    //#endregion
+
+    function preload ()
+    {
+        //for preloading sprites and other shit
+        
+        //load our images and stuff, oh and scale them up
+        this.load.image('playerSprite', 'assets/guy_0.png');
+        this.load.image('winnerSprite', 'assets/guy_1.png');
+
+        this.load.image('dogSprite', 'assets/dog.png');
+
+        this.load.image('ballSprite0', 'assets/ball_0.png');
+        this.load.image('ballSprite1', 'assets/ball_1.png');
+        this.load.image('ballSprite2', 'assets/ball_2.png');
+        this.load.image('ballSprite3', 'assets/ball_3.png');
+
+        this.load.image('wallSprite', 'assets/wall.png');
+        this.load.image('walllSprite', 'assets/wall_l.png');
+        this.load.image('wallrSprite', 'assets/wall_r.png');
+        this.load.image('wallCltSprite', 'assets/wall_clt.png');
+        this.load.image('wallClbSprite', 'assets/wall_clb.png');
+        this.load.image('wallCrtSprite', 'assets/wall_crt.png');
+        this.load.image('wallCrbSprite', 'assets/wall_crb.png');
+
+        this.load.image('grass0Sprite', 'assets/grass_0.png');
+        this.load.image('grass1Sprite', 'assets/grass_1.png');
+        this.load.image('treeSprite', 'assets/tree.png');
+
+        this.load.image('emptySprite', 'assets/empty.png');
+
+        this.load.image('0Sprite', 'assets/numbers/0.png');
+        this.load.image('1Sprite', 'assets/numbers/1.png');
+        this.load.image('2Sprite', 'assets/numbers/2.png');
+        this.load.image('3Sprite', 'assets/numbers/3.png');
+        this.load.image('4Sprite', 'assets/numbers/4.png');
+        this.load.image('5Sprite', 'assets/numbers/5.png');
+        this.load.image('dotsSprite', 'assets/numbers/dots.png');
+        this.load.image('bgSprite', 'assets/bg.png');
+
+        this.load.image('gameoverSprite', 'assets/gameover.png');
+
+        this.load.spritesheet('logo', 'assets/logo.png', { frameWidth: 56, frameHeight: 32 });
+
+        this.load.image('controls0', 'assets/controls_0.png');
+        this.load.image('controls1', 'assets/controls_1.png');
+
+        this.load.image('site', 'assets/site.png');
+
+        //and load the audio
+        this.load.audio('bump', 'assets/sound/bump.mp3');
+        this.load.audio('hurt', 'assets/sound/hurt.mp3');
+        this.load.audio('start', 'assets/sound/start.mp3');
+        this.load.audio('bark', 'assets/sound/bark.mp3');
+        this.load.audio('soundtrack', 'assets/sound/soundtrack.mp3');
+    }
+
+    function create ()
+    {
+        //assign all controls
+        left_0 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.A);
+        up_0 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.W);
+        right_0 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.D);
+        down_0 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.S);
+
+        left_1 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.LEFT);
+        up_1 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.UP);
+        right_1 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.RIGHT);
+        down_1 = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.DOWN);
+
+        restart = this.input.keyboard.addKey(Phaser.Input.Keyboard.KeyCodes.R);
+
+        //size everything up
+        this.cameras.main.setBounds(0, 0, worldWidth, worldHeight);
+        this.cameras.main.setZoom(spriteSizeMultiplier);
+
+        //create physics on this layer with these properties 
+        //so we can later put players and other things on it
+        allPlayersGroup = this.physics.add.group({
+        dragX: 500,
+        dragY: 500,
+        collideWorldBounds: true
+        });
+        
+        //spawn our player
+        player_0 = allPlayersGroup.create(28, worldHeight / 2, 'playerSprite');
+        player_1 = allPlayersGroup.create(worldWidth - 28, worldHeight / 2, 'playerSprite');
+
+        //spawn the dog
+        dog = allPlayersGroup.create(worldWidth / 2, worldHeight / 2 - 8, 'dogSprite');
+
+        //increase the size
+        player_0.setDisplaySize(10, 10);
+        player_1.setDisplaySize(10, 10);
+
+        //add colliders to the allplayers group
+        this.physics.add.collider(allPlayersGroup);
+
+        //create physics on this layer with these properties 
+        //so we can later put our generic props on it
+        genericPropsGroup = this.physics.add.group({
+        bounceX: 1.1,
+        bounceY: 1.1,
+        collideWorldBounds: true
+        });
+        
+        //add colliders to the generic props
+        this.physics.add.collider(genericPropsGroup);
+
+        //enable collision between these two groups
+        this.physics.add.collider(allPlayersGroup, genericPropsGroup);
+
+
+        //create physics on this layer with these properties 
+        //so we can later put our generic props on it
+        staticObjectsGroup = this.physics.add.group({
+        immovable: true
+        });
+
+        //enable collision between these groups
+        this.physics.add.collider(staticObjectsGroup, genericPropsGroup);
+        this.physics.add.collider(staticObjectsGroup, allPlayersGroup);
+
+        //create physics on this layer with these properties 
+        //so we can later put our generic props on it
+        backgroundObjectsGroup = this.physics.add.group({
+        immovable: true
+        });
+
+        //same fucking thing for the goals
+        goalsGroup = this.physics.add.group({
+        immovable: true
+        });
+
+        //create goal zones
+        goal_0 = goalsGroup.create(16, worldHeight / 2 - 4, 'emptySprite');
+        goal_1 = goalsGroup.create(worldWidth - 16, worldHeight / 2 - 4, 'emptySprite');
+        this.physics.add.collider(goalsGroup, genericPropsGroup);
+
+        //same for the scores
+        scoresGroup = this.physics.add.group({
+        immovable: true
+        });
+
+        //create the map
+        createMap();
+
+        //create these things for scores because text in phaser looks ugly as fucking shit
+        scoresGroup.create(worldWidth / 2, 16, 'bgSprite').setDisplaySize(24, 10);;
+        number_0 = scoresGroup.create(worldWidth / 2 - 8, 16, '0Sprite');
+        scoresGroup.create(worldWidth / 2, 16, 'dotsSprite');
+        number_1 = scoresGroup.create(worldWidth / 2 + 8, 16, '0Sprite');
+
+        var logoAnimation = this.anims.create({
+        key: 'shiny',
+        frames: this.anims.generateFrameNumbers('logo'),
+        frameRate: 30,
+        repeat: -1
+        });
+
+        logo = this.add.sprite(worldWidth / 2, worldHeight / 2, 'logo').setScale(1.9);
+        controls0 = this.add.sprite(worldWidth / 2 - 40, worldHeight / 2 + 40, 'controls0');
+        controls1 = this.add.sprite(worldWidth / 2 + 40, worldHeight / 2 + 40, 'controls1');
+        site = this.add.sprite(worldWidth - 28, worldHeight - 6, 'site').setScale(0.75);
+
+        logo.play('shiny');
+
+        //assign sound and stuff
+        bump = this.sound.add('bump', {volume: 0.25});
+        hurt = this.sound.add('hurt', {volume: 0.25});
+        start = this.sound.add('start', {volume: 0.5});
+        bark = this.sound.add('bark', {volume: 0.15});
+
+        var music = this.sound.add('soundtrack', {volume: 0.5, loop: true});
+        if(!musicIsPlaying)
+        {
+            musicIsPlaying = true;
+            music.play();
+        }
+    }
+
+    //creates the map, duh
+    function createMap()
+    {
+        //do corners
+        staticObjectsGroup.create(4, 4, 'wallCltSprite');
+        staticObjectsGroup.create(Math.floor(worldWidth / 8) * 8 - 4, 4, 'wallCrtSprite');
+        staticObjectsGroup.create(4, Math.floor(worldHeight / 8) * 8 - 8, 'wallClbSprite');
+        staticObjectsGroup.create(Math.floor(worldWidth / 8) * 8 - 4, Math.floor(worldHeight / 8) * 8 - 8, 'wallCrbSprite');
+
+        //do walls and grass
+        for(var x = 0; x < Math.floor(worldWidth / 8); x++)
+        {        
+            for(var y = 0; y < Math.floor(worldHeight / 8); y++)
+            {
+                //randomly place grass n stuff
+                if(Math.random() > 0.95)
+                {
+                    backgroundObjectsGroup.create(x * 8 + 4, y * 8, 'grass0Sprite');
+                }
+                else if(Math.random() > 0.95)
+                {
+                    backgroundObjectsGroup.create(x * 8 + 4, y * 8, 'grass1Sprite');
+                }
+
+                var onEdgeX = false;
+                var onEdgeY = false;
+
+                if(x == 0  || x == Math.floor(worldWidth / 8) - 1)
+                {
+                    onEdgeX = true;
+                }
+
+                if(y == 0  || y == Math.floor(worldHeight / 8) - 1)
+                {
+                    onEdgeY = true;
+                }
+
+                //skip inners
+                if(!onEdgeX && !onEdgeY)
+                {
+                    if(Math.random() > 0.99 && x * 8 + 4 != 16 && x * 8 + 4 != worldWidth - 16 && y * 8 != worldHeight / 2 - 4)
+                    {
+                        staticObjectsGroup.create(x * 8 + 4, y * 8, 'treeSprite');
+                    }
+
+                    continue;
+                }
+
+                //skip corners
+                if(onEdgeX && onEdgeY)
+                {
+                    continue;
+                }
+
+                //walls on the x axis
+                if (onEdgeX)
+                {
+                    //walls to the left and right
+                    if(x * 8 < worldWidth / 2)
+                    {
+                        staticObjectsGroup.create(x * 8 + 4, y * 8, 'walllSprite');
+                    }
+                    else
+                    {
+                        staticObjectsGroup.create(x * 8 + 4, y * 8, 'wallrSprite');
+                    }
+                }
+                else if (onEdgeY)
+                {
+                    if(y * 8 < worldHeight / 2)
+                    {
+                        staticObjectsGroup.create(x * 8 + 4, y * 8 + 4, 'wallSprite');
+                    }
+                    else
+                    {
+                        staticObjectsGroup.create(x * 8 + 4, y * 8, 'wallSprite');
+                    }
+                }
+            }
+        }
+
+        //do goalies
+        //left goalie
+        staticObjectsGroup.create(12, worldHeight / 2 - 16, 'wallCltSprite');
+        staticObjectsGroup.create(20, worldHeight / 2 - 16, 'wallSprite');
+
+        staticObjectsGroup.create(12, worldHeight / 2 - 8, 'walllSprite');
+        staticObjectsGroup.create(12, worldHeight / 2, 'walllSprite');
+        staticObjectsGroup.create(12, worldHeight / 2 + 8, 'walllSprite');
+
+        staticObjectsGroup.create(12, worldHeight / 2 + 16, 'wallClbSprite');
+        staticObjectsGroup.create(20, worldHeight / 2 + 16, 'wallSprite');
+
+
+
+        //right goalie
+        staticObjectsGroup.create(worldWidth - 12, worldHeight / 2 - 16, 'wallCrtSprite');
+        staticObjectsGroup.create(worldWidth - 20, worldHeight / 2 - 16, 'wallSprite');
+
+        staticObjectsGroup.create(worldWidth - 12, worldHeight / 2 - 8, 'wallrSprite');
+        staticObjectsGroup.create(worldWidth - 12, worldHeight / 2, 'wallrSprite');
+        staticObjectsGroup.create(worldWidth - 12, worldHeight / 2 + 8, 'wallrSprite');
+        
+        staticObjectsGroup.create(worldWidth - 12, worldHeight / 2 + 16, 'wallCrbSprite');
+        staticObjectsGroup.create(worldWidth - 20, worldHeight / 2 + 16, 'wallSprite');
+    }
+
+    function update ()
+    {
+        if(!gameHasStarted)
+        {
+            //any button pressed
+            if(left_0.isDown || right_0.isDown || up_0.isDown || down_0.isDown || left_1.isDown || right_1.isDown || up_1.isDown || down_1.isDown)
+            {
+                //destroy logo and controls
+                logo.destroy();
+                controls0.destroy();
+                controls1.destroy();
+                site.destroy();
+
+                //create ball
+                ball = genericPropsGroup.create(worldWidth / 2, worldHeight / 2, 'ballSprite0');
+                //set the max velocity              
+                ball.body.setMaxVelocity(maxVelocity, maxVelocity);
+                gameHasStarted = true;
+
+                //oh and play the super cool *ping*
+                start.play();
+            }
+        }
+        else
+        {
+            //player 1 controls
+            if (left_0.isDown)
+            {
+                player_0.setVelocityX(-playerSpeed);
+            }
+            else if (right_0.isDown)
+            {
+                player_0.setVelocityX(playerSpeed);
+            }
+            if (up_0.isDown)
+            {
+                player_0.setVelocityY(-playerSpeed);
+            }
+            else if (down_0.isDown)
+            {
+                player_0.setVelocityY(playerSpeed);
+            }
+
+            //player 2 controls
+            if (left_1.isDown)
+            {
+                player_1.setVelocityX(-playerSpeed);
+            }
+            else if (right_1.isDown)
+            {
+                player_1.setVelocityX(playerSpeed);
+            }
+            if (up_1.isDown)
+            {
+                player_1.setVelocityY(-playerSpeed);
+            }
+            else if (down_1.isDown)
+            {
+                player_1.setVelocityY(playerSpeed);
+            }
+
+            //make the dog move towards the ball at half the player's speed
+            dog.setVelocityX(dog.body.velocity.x + 100 * (0.5 - (1 * Math.random())));
+            dog.setVelocityY(dog.body.velocity.y + 100 * (0.5 - (1 * Math.random())));
+
+            //play dog sound when dog bumps into shit
+            if (!dog.body.touching.none)
+            {
+                bark.play();
+
+                //oh and flip him around for variety why not
+                dog.flipX = !dog.flipX;
+            }
+
+            if(ball.body !== undefined)
+            {
+                //limit velocity because the built in phaser method for this sucks dick
+                if(ball.body.velocity.x > maxVelocity)
+                {
+                    ball.setVelocityX(ball.body.velocity.x.clamp(-maxVelocity, maxVelocity));
+                }
+
+                if(ball.body.velocity.y > maxVelocity)
+                {
+                    ball.setVelocityX(ball.body.velocity.y.clamp(-maxVelocity, maxVelocity));
+                }
+
+                //make sure ball stays inside bounds
+                if(ball.x < 0 || ball.x > worldWidth || ball.y < 0 || ball.y > worldHeight)
+                {
+                    ball.x = worldWidth / 2; 
+                        ball.y = worldHeight / 2; 
+                        ball.setVelocityX(0);
+                        ball.setVelocityY(0);
+                }
+
+                //change sprites based on speed
+                var totalVelocity = Math.abs(ball.body.velocity.x) + Math.abs(ball.body.velocity.y);
+                if(totalVelocity < (maxVelocity / 5))
+                {
+                    ball.setTexture('ballSprite0');
+                }
+                else if(totalVelocity < (maxVelocity / 5) * 2)
+                {
+                    ball.setTexture('ballSprite1');
+                }
+                else if(totalVelocity < (maxVelocity / 5) * 3)
+                {
+                    ball.setTexture('ballSprite2');
+                }
+                else
+                {
+                    ball.setTexture('ballSprite3');
+                }
+
+                //shake the camera when the ball touches something oh and play an epic sound effect woooooooh
+                if (!ball.body.touching.none)
+                {
+                    bump.play();
+                    this.cameras.main.shake(10 * spriteSizeMultiplier, 0.0005);
+                    //temporarily disabled for epilepsy reasons
+                    //this.cameras.main.flash(100, 255, 255, 255, true);
+                }
+
+                //make the ball rotate
+                ball.setAngularVelocity(-300);
+
+                //and some randomness to make it interesting
+                ball.setVelocityX(ball.body.velocity.x + 2 * (0.5 - (1 * Math.random())));
+                ball.setVelocityY(ball.body.velocity.y + 2 * (0.5 - (1 * Math.random())));
+            }   
+
+            //check for goals
+            if(!goal_0.body.touching.none)
+            {
+                //play the goal sound
+                hurt.play();
+                //reset ball and increase score
+                ball.destroy();
+
+                player_1_score++;
+                if(player_1_score >= 5)
+                {
+                    //end the game and spawn the restart text
+                    genericPropsGroup.create(worldWidth / 2, worldHeight / 2, 'gameoverSprite');
+                    gameIsOver = true;
+                }
+                else
+                {
+                    ball = genericPropsGroup.create(worldWidth / 2, worldHeight / 2, 'ballSprite0');
+                }
+            }
+
+            if(!goal_1.body.touching.none)
+            {
+                //play the goal sound
+                hurt.play();
+                //reset ball and increase score
+                ball.destroy();
+
+                player_0_score++;
+                if(player_0_score >= 5)
+                {
+                    //end the game and spawn the restart text
+                    genericPropsGroup.create(worldWidth / 2, worldHeight / 2, 'gameoverSprite');
+                    gameIsOver = true;
+                }
+                else
+                {
+                    ball = genericPropsGroup.create(worldWidth / 2, worldHeight / 2, 'ballSprite0');
+                }
+            }
+
+            //display left score
+            switch(player_0_score)
+            {
+                case 0:
+                number_0.setTexture('0Sprite');
+                    break;
+            
+                case 1:
+                number_0.setTexture('1Sprite');
+                    break;
+
+                case 2:
+                number_0.setTexture('2Sprite');
+                    break;
+
+                case 3:
+                number_0.setTexture('3Sprite');
+                    break;
+
+                case 4:
+                number_0.setTexture('4Sprite');
+                    break;
+
+                case 5:
+                number_0.setTexture('5Sprite');
+
+                //if this player won give them this sprite
+                player_0.setTexture('winnerSprite');
+
+                if (restart.isDown)
+                {
+                    //restart the game when pressing the restart key
+                    this.registry.destroy(); // destroy registry
+                    this.events.off(); // disable all active events
+                    this.scene.restart(); // restart current scene
+
+                    player_0_score = 0;
+                    player_1_score = 0;
+                    gameIsOver = false;
+                    gameHasStarted = false;
+                }
+                    break;
+            }
+
+            switch(player_1_score)
+            {
+                case 0:
+                number_1.setTexture('0Sprite');
+                    break;
+            
+                case 1:
+                number_1.setTexture('1Sprite');
+                    break;
+
+                case 2:
+                number_1.setTexture('2Sprite');
+                    break;
+
+                case 3:
+                number_1.setTexture('3Sprite');
+                    break;
+
+                case 4:
+                number_1.setTexture('4Sprite');
+                    break;
+
+                case 5:
+                number_1.setTexture('5Sprite');
+
+                //if this player won give them this sprite
+                player_1.setTexture('winnerSprite');
+
+                if (restart.isDown)
+                {
+                    //restart the game when pressing the restart key
+                    this.registry.destroy(); // destroy registry
+                    this.events.off(); // disable all active events
+                    this.scene.restart(); // restart current scene
+                
+                    player_0_score = 0;
+                    player_1_score = 0;
+                    gameIsOver = false;
+                    gameHasStarted = false;
+                }
+                    break;
+            }
+        }
+    }
+
+    //custom function to contain a number into a range.
+    Number.prototype.clamp = function(min, max) {
+    return Math.min(Math.max(this, min), max);
+    };
+    </script>
+</body>
+</html>
